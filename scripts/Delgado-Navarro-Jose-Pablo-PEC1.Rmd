@@ -303,6 +303,13 @@ PEC1 <- SummarizedExperiment(
 PEC1
 ```
 
+### Generar el objeto de en formato `.Rda`
+
+```{r}
+save(PEC1, file = "Delgado-Navarro-Jose-Pablo-PEC1.rda")
+```
+
+
 ### Análisis Exploratorio
 
 ```{r, echo=TRUE}
