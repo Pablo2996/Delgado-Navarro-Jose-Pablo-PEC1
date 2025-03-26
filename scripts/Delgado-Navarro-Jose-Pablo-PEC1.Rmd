@@ -1,0 +1,358 @@
+---
+title: "Delgado-Navarro-Jose_Pablo-PEC1"
+author: "Pablo Delgado"
+date: "`r Sys.Date()`"
+output:
+  pdf_document:
+    toc: false
+    number_sections: true
+fontsize: 11pt
+geometry: margin=1in
+---
+
+# Abstract
+Este estudio explora el uso de muestras de Pap tests para la identificación de biomarcadores mediante análisis metabolómico, basado en el artículo Metabolomics of Papanicolaou Tests for the Discovery of Ovarian Cancer Biomarkers. Se utilizó el dataset ST003564 del Metabolomics Workbench, procesado e integrado en un objeto SummarizedExperiment en R. Se realizaron análisis exploratorios de las intensidades de metabolitos y su distribución por modo de ionización. Los resultados indican que las muestras de Pap contienen perfiles metabolómicos reproducibles, lo que respalda su potencial como herramienta no invasiva para la detección temprana de cáncer de ovario.
+
+\newpage
+\tableofcontents
+\newpage
+
+# Introducción
+El cáncer de ovario es una enfermedad con alta tasa de mortalidad debido a la ausencia de síntomas en etapas tempranas y la falta de biomarcadores específicos para su detección temprana. El estudio de Sah et., *al* investiga la posibilidad de utilizar muestras de Pap tests como fuente de biomarcadores, dado que ya se recolectan de manera rutinaria en controles ginecológicos.
+
+Este informe reproduce el enfoque metabolómico de dicho estudio, empleando datos públicos del Metabolomics Workbench (ST003564) y utilizando herramientas bioinformáticas para evaluar la calidad de las muestras y la variabilidad de los metabolitos identificados.
+
+
+# Objetivos
+## General: 
+- Evaluar la viabilidad de utilizar datos metabolómicos de Pap tests para la identificación de biomarcadores.
+
+## Específicos:
+
+- Utilizar el dataset ST003564 y analizar su estructura mediante SummarizedExperiment.
+
+- Evaluar la distribución de metabolitos y la variabilidad entre muestras mediante análisis exploratorios.
+
+- Comparar los resultados con los hallazgos reportados en el artículo científico.
+
+# Métodos
+## Selección del Dataset
+El dataset ST003564 fue seleccionado porque contiene datos metabolómicos recientes obtenidos de Pap tests, los cuales alinean perfectamente como sujeto de estudio para la presente PEC. Además, el set de datos puede ser utilizado para correborar un objetico con gran impacto social a nivel de salud, campo que que de vital importancia en el actual enfoque bioinformático a nivel mundial.
+
+## Procesamiento en R
+```{r, include=FALSE}
+library(readr)
+library(tidyr)
+library(ggplot2)
+library(ggfortify)
+library(pheatmap)
+library(SummarizedExperiment)
+```
+
+
+```{r setup, echo=TRUE, message=FALSE}
+# Importe de resultados obtenido de Metabolomics Workbench (ST003564)
+ST003564_AN005855_Results <- read.table("ST003564_AN005855_Results.txt",  
+                                        header = TRUE, sep = "\t")
+ST003564_AN005856_Results <- read.table("ST003564_AN005856_Results.txt",  
+                                        header = TRUE, sep = "\t")
+# Separar 'mz_rt' en 'mz' y 'rt'
+ST003564_AN005855_Results <- ST003564_AN005855_Results %>% separate(col = mz_rt, 
+                              into = c("mz", "rt"), sep = "_", convert = TRUE)
+ST003564_AN005856_Results <- ST003564_AN005856_Results %>% separate(col = mz_rt, 
+                              into = c("mz", "rt"), sep = "_", convert = TRUE)
+
+# Agregar modo de ionización
+ST003564_AN005855_Results$IonMode <- "Positive"
+ST003564_AN005856_Results$IonMode <- "Negative"
+
+# Crear matrices de intensidades y metadatos
+matrizDatos_pos <- as.matrix(ST003564_AN005855_Results[, 
+                        !(names(ST003564_AN005855_Results) %in% 
+                            c("mz", "rt", "IonMode"))])
+matrizDatos_neg <- as.matrix(ST003564_AN005856_Results[, 
+                        !(names(ST003564_AN005856_Results) %in% 
+                            c("mz", "rt", "IonMode"))])
+matrizDatos <- rbind(matrizDatos_pos, matrizDatos_neg)
+
+colData <- data.frame(SampleName = colnames(matrizDatos), 
+                      SampleType = ifelse(grepl("blank", colnames(matrizDatos)),
+                                          "Blanco", "Muestra"), 
+                      row.names = colnames(matrizDatos))
+
+rowData <- data.frame(mz = c(ST003564_AN005855_Results$mz, ST003564_AN005856_Results$mz), 
+                      rt = c(ST003564_AN005855_Results$rt, ST003564_AN005856_Results$rt), 
+                      IonMode = c(rep("Positive", nrow(ST003564_AN005855_Results)), 
+                                  rep("Negative", nrow(ST003564_AN005856_Results))),
+                      row.names = rownames(matrizDatos))
+
+# Creacion de la clase de SummarizedExperiment
+PEC1 <- SummarizedExperiment(
+  assays = list(counts = matrizDatos),
+  colData = colData,
+  rowData = rowData
+)
+```
+\newpage
+# Resultados
+## Exploración de Datos
+### Resumen del Dataset
+```{r}
+dim(PEC1)
+```
+El objeto `SummarizedExperiment` tiene 11,051 metabolitos y 40 muestras.
+
+### Distribución de Intensidades
+```{r histograma-intensidades, fig.width=5, fig.height=4, echo=FALSE, fig.align='center'}
+hist(log10(assay(PEC1) + 1), breaks = 50, 
+     col = "skyblue",
+     main = "Distribución de Intensidades (log10)", 
+     xlab = "Intensidad (log10)")
+```
+
+\begin{center}
+Figura 1. Histográma de distribución de muestras. El histograma muestra una distribución logarítmica, lo que sugiere que los datos metabolómicos siguen una distribución altamente dispersa.
+\end{center}
+
+### Análisis PCA
+```{r pca-plot, fig.width=5, fig.height=4, echo=FALSE, fig.align='center'}
+PCA_PEC1 <- prcomp(t(assay(PEC1)), scale. = TRUE)
+
+autoplot(PCA_PEC1, data = as.data.frame(colData(PEC1)), colour = "SampleType") +
+  theme_minimal() + ggtitle("PCA de Muestras")
+```
+
+\begin{center}
+Figura 2. Análisis PCA. El PCA revela patrones de agrupación según el tipo de muestra.
+\end{center}
+
+### Clustering de Muestras
+```{r clustering-heatmap, fig.width=4, fig.height=3, echo=FALSE, fig.align='center'}
+corr_PEC1 <- cor(assay(PEC1), method = "spearman")
+
+pheatmap(corr_PEC1, clustering_distance_rows = "correlation",
+         clustering_distance_cols = "correlation",
+         main = "Clustering de Muestras (Spearman)")
+```
+
+\begin{center}
+Figura 3. Heatmap de correlaciones entre muestras. El heatmap agrupaciones de correlaciones entre distintas muestras, lo que indica posibles grupos homogéneos.
+\end{center}
+
+\newpage
+# Discusión
+Los resultados obtenidos en este análisis son consistentes con el estudio original de Sah *et al*., en el cual se encontraron perfiles metabolómicos bien diferenciados en las muestras de Pap tests.
+
+## Análisis Exploratorio y Comparación de Métodos
+
+El análisis exploratorio realizado sobre el dataset ST003564 permitió evaluar la distribución de intensidades, la variabilidad de las muestras y la coherencia de los datos de metabolómica en muestras de Pap tests.  
+
+Uno de los aspectos clave de este estudio fue el uso de la clase `SummarizedExperiment` en R para estructurar los datos de manera eficiente. Para comprender su relevancia, se comparó con `ExpressionSet`, una clase previamente utilizada en análisis transcriptómicos.  
+
+### Diferencias entre SummarizedExperiment y ExpressionSet
+#### **Estructura y Flexibilidad**  
+- `SummarizedExperiment` permite almacenar múltiples matrices de datos (por ejemplo, conteos sin procesar, datos normalizados, transformaciones logarítmicas), mientras que `ExpressionSet` está limitado a una única matriz de datos de expresión (Morgan *et al*., 2020).  
+- `SummarizedExperiment` usa una estructura basada en `SimpleList` para manejar datos de diferentes formatos y tecnologías, mientras que `ExpressionSet` fue diseñado principalmente para datos de microarrays (Huber *et al*., 2015).  
+
+#### **Manejo de Metadatos**  
+- En `SummarizedExperiment`, los metadatos de muestras se almacenan en `colData`, mientras que en `ExpressionSet` se encuentran en `phenoData` (Morgan *et al*., 2020).  
+- `SummarizedExperiment` usa `rowData` para describir las características (genes, metabolitos), mientras que `ExpressionSet` emplea `featureData` (Huber *et al*., 2015).  
+
+#### **Compatibilidad y Uso en Bioconductor**  
+- `SummarizedExperiment` es la opción recomendada para análisis modernos en Bioconductor, especialmente para datos de RNA-Seq, metabolómica y proteómica (Lawrence *et al*., 2013).  
+- `ExpressionSet` sigue siendo utilizado en algunos análisis de microarrays, pero ha sido reemplazado en gran parte por `SummarizedExperiment` en flujos de trabajo recientes (Huber *et al*., 2015).  
+
+Esta comparación evidencia que `SummarizedExperiment` ofrece una mayor versatilidad y capacidad de integración en estudios metabolómicos modernos, lo que lo convierte en la mejor opción para estructurar el dataset de este análisis. 
+
+
+## Distribución de Intensidades:
+La alta dispersión observada en los valores de intensidad indica que algunos metabolitos son mucho más abundantes que otros, lo cual es típico en datos metabolómicos.
+
+## PCA:
+La separación observada en el PCA indica que las muestras de control de calidad y blancos tienen perfiles distintos a las muestras experimentales, lo que respalda la integridad del dataset.
+
+## Clustering:
+La agrupación en el heatmap sugiere que las muestras comparten perfiles similares dentro de su grupo, lo cual indica que el dataset es consistente y adecuado para estudios de biomarcadores.
+
+## Comparación con el Artículo Original:
+El estudio de referencia identificó ciertos lípidos clave como candidatos a biomarcadores. Aunque este análisis no se centra en la identificación de metabolitos específicos, los patrones observados en la distribución y agrupamiento de las muestras son similares a los reportados en el artículo.
+
+# Conclusiones
+- Los datos metabolómicos de Pap tests presentan patrones de agrupamiento consistentes, lo que respalda su validez para estudios de biomarcadores.
+
+- La estructura en SummarizedExperiment facilita la exploración y análisis de este tipo de dataset.
+
+- Los resultados coinciden con hallazgos previos, lo que sugiere que el dataset puede ser útil en la detección de biomarcadores.
+
+\newpage
+# Referencias
+
+Bioconductor. (2023). SummarizedExperiment: A container for high-throughput assays and associated meta-data. Bioconductor. Disponible en: https://bioconductor.org/packages/release/bioc/html/SummarizedExperiment.html
+
+Huber, W., Carey, V. J., Gentleman, R., Anders, S., Carlson, M., Carvalho, B. S., García, J. M., *et al*. (2015). Orchestrating high-throughput genomic analysis with Bioconductor. Nature Methods, 12(2), 115–121. https://doi.org/10.1038/nmeth.3252
+
+Kassambara, A. (2017). ggpubr: ‘ggplot2’ Based Publication Ready Plots. R package version 0.4.0. Disponible en: https://rpkgs.datanovia.com/ggpubr/
+
+Kolde, R. (2019). pheatmap: Pretty Heatmaps. R package version 1.0.12. Disponible en: https://cran.r-project.org/web/packages/pheatmap/index.html
+
+Lawrence, M., Huber, W., Pagès, H., Aboyoun, P., Carlson, M., Gentleman, R., Morgan, M. T. (2013). Software for computing and annotating genomic ranges. PLoS Computational Biology, 9(8), e1003118. https://doi.org/10.1371/journal.pcbi.1003118
+
+Metabolomics Workbench. (2023). Study ST003564: Metabolomics analysis of Pap test samples. Disponible en: https://www.metabolomicsworkbench.org/data/DRCCMetadata.php?Mode=Study&StudyID=ST003564
+
+R Core Team. (2023). R: A language and environment for statistical computing. R Foundation for Statistical Computing, Vienna, Austria. Disponible en: https://www.R-project.org/
+
+Research Square. (2023). Metabolomics of Papanicolaou Tests for the Discovery of Ovarian Cancer Biomarkers. Research Square. Disponible en: https://assets-eu.researchsquare.com/files/rs-2511186/v1/
+
+Sah, S.; Schwiebert, E.M.; Moore, S.G.; Liu, Y.; Gaul, D.A.; Boylan, K.L.M.; Skubitz, A.P.N.; Fernández, F.M. Metabolomics of Papanicolaou Tests for the Discovery of Ovarian Cancer Biomarkers.Metabolites 2024, 14, 600. https://doi.org/10.3390/metabo14110600
+
+Wickham, H., François, R., Henry, L., & Müller, K. (2023). dplyr: A grammar of data manipulation. R package version 1.1.2. Disponible en: https://dplyr.tidyverse.org/
+
+Wickham, H. (2016). ggplot2: Elegant Graphics for Data Analysis. Springer. https://ggplot2.tidyverse.org/
+
+\newpage
+# Anexos
+## Código crudo para la realización del Proceso de Análisis de Datos Ómicos
+```{r, echo=TRUE, message=FALSE}
+library(readr)
+library(tidyr)
+library(ggplot2)
+library(ggfortify)
+library(pheatmap)
+library(SummarizedExperiment)
+```
+
+### Procesamiento de datos con R para hacerlos compatibles con SummarizedExperiment
+
+```{r, echo=TRUE}
+# Leer archivos de ionización positiva y negativa
+ST003564_AN005855_Results <- read.table("ST003564_AN005855_Results.txt",  
+                                        header = TRUE, sep = "\t")
+ST003564_AN005856_Results <- read.table("ST003564_AN005856_Results.txt",  
+                                        header = TRUE, sep = "\t")
+
+#ST003564_AN005855_Results
+#ST003564_AN005856_Results
+
+# Agregar modo de ionización
+ST003564_AN005855_Results$IonMode <- "Positive"
+ST003564_AN005856_Results$IonMode <- "Negative"
+```
+
+```{r, echo=TRUE}
+# Separar 'mz_rt' en 'mz' y 'rt'
+ST003564_AN005855_Results <- ST003564_AN005855_Results %>% separate(col = mz_rt, 
+                              into = c("mz", "rt"), sep = "_", convert = TRUE)
+ST003564_AN005856_Results <- ST003564_AN005856_Results %>% separate(col = mz_rt, 
+                              into = c("mz", "rt"), sep = "_", convert = TRUE)
+# tail(ST003564_AN005856_Results)
+```
+
+```{r, echo=TRUE}
+# Crear la matriz de datos
+matrizDatos_pos <- as.matrix(ST003564_AN005855_Results[, 
+                        !(names(ST003564_AN005855_Results) %in% 
+                            c("mz", "rt", "IonMode"))])
+matrizDatos_neg <- as.matrix(ST003564_AN005856_Results[, 
+                        !(names(ST003564_AN005856_Results) %in% 
+                            c("mz", "rt", "IonMode"))])
+
+# Combinar ambos datasets en una sola matriz de intensidades
+matrizDatos <- rbind(matrizDatos_pos, matrizDatos_neg)
+head(matrizDatos, 3)
+```
+
+```{r, echo=TRUE}
+# Crear el colData
+muestras <- colnames(matrizDatos)
+
+# Definir tipo de muestra (blancos, controles de calidad y muestras normales)
+tipoMuestra <- ifelse(grepl("blank", muestras, ignore.case = TRUE), "Blanco",
+                      ifelse(grepl("QC", muestras, ignore.case = TRUE), 
+                             "Control de Calidad", "Muestra"))
+
+# Crear colData con data.frame estándar
+colData <- data.frame(SampleName = muestras, SampleType = tipoMuestra, 
+                      row.names = muestras)
+
+tail(colData, 15)
+```
+
+```{r, echo=TRUE}
+# Crear el rowData
+# Unir las filas de ambos datasets y conservar mz, rt e IonMode
+rowData <- data.frame(mz = c(ST003564_AN005855_Results$mz, 
+                             ST003564_AN005856_Results$mz), 
+                      rt = c(ST003564_AN005855_Results$rt, 
+                             ST003564_AN005856_Results$rt),
+                      IonMode = c(rep("Positive", 
+                                      nrow(ST003564_AN005855_Results)), 
+                                  rep("Negative", 
+                                      nrow(ST003564_AN005856_Results))),
+                      row.names = rownames(matrizDatos))
+head(rowData, 5)
+tail(rowData, 5)
+```
+
+```{r, echo=TRUE}
+PEC1 <- SummarizedExperiment(
+  assays = list(counts = matrizDatos),
+  colData = colData,
+  rowData = rowData
+)
+
+PEC1
+```
+
+### Análisis Exploratorio
+
+```{r, echo=TRUE}
+# Número de características (filas) y muestras (columnas)
+cat("Metabolítos:", nrow(PEC1), "\nMuestras:", ncol(PEC1), "\n")
+
+# Graficar el histograma de intensidades (log10)
+hist(log10(assay(PEC1)[, 1:40] + 1),
+     breaks = 50,
+     col = "skyblue",
+     main = "Distribución de Intensidades (log10)",
+     xlab = "Intensidad (log10)")
+
+# Visualizar las primeras filas de colData (metadatos de muestras)
+head(colData(PEC1))
+
+# Resumen de tipos de muestra
+table(colData(PEC1)$SampleType)
+
+# Ver la información de las características (m/z, rt, IonMode)
+head(rowData(PEC1))
+tail(rowData(PEC1))
+```
+
+### Análisis multivariado: PCA y Agrupamientos
+
+#### PCA
+>
+
+```{r, echo=TRUE}
+# Realizar PCA sobre la matriz de intensidades
+PCA_PEC1 <- prcomp(t(assay(PEC1)), scale. = TRUE)
+
+# Grafico del PCA coloreando por SampleType o por IonMode
+autoplot(PCA_PEC1, data = as.data.frame(colData(PEC1)), 
+         colour = "SampleType") +
+  theme_minimal() +
+  ggtitle("PCA de Muestras")
+```
+
+#### Clustering
+>
+
+```{r, echo=TRUE}
+# Calcular correlación
+corr_PEC1 <- cor(assay(PEC1), method = "spearman")
+
+# Generar un heatmap para observar agrupamientos
+pheatmap(corr_PEC1, 
+         clustering_distance_rows = "correlation",
+         clustering_distance_cols = "correlation",
+         main = "Clustering de Muestras (Spearman)")
+```
