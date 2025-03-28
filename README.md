@@ -12,4 +12,4 @@ Este repositorio contiene los análisis de la PEC1 para la asignatura de Anális
 ### 📖 Uso del Código
 1. Clona el repositorio:  
    ```bash
-   git clone https://github.com/Pablo2996/M0.157-Analisis_de_datos_omicos_Delgado_Navarro_Jose_Pablo.git
+   git clone https://github.com/Pablo2996/Delgado-Navarro-Jose-Pablo-PEC1.git

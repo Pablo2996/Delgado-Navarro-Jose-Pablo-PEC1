@@ -1,0 +1,41 @@
+SampleName	SampleType
+X6	X6	Muestra
+X10	X10	Muestra
+X14	X14	Muestra
+X18	X18	Muestra
+X20	X20	Muestra
+X26	X26	Muestra
+X34	X34	Muestra
+X35	X35	Muestra
+X43	X43	Muestra
+X49	X49	Muestra
+X61	X61	Muestra
+X69	X69	Muestra
+X73	X73	Muestra
+X74	X74	Muestra
+X76	X76	Muestra
+X77	X77	Muestra
+X84	X84	Muestra
+X93	X93	Muestra
+X96	X96	Muestra
+X99	X99	Muestra
+X101	X101	Muestra
+X105	X105	Muestra
+X111	X111	Muestra
+X113	X113	Muestra
+X119	X119	Muestra
+X132	X132	Muestra
+X151	X151	Muestra
+X154	X154	Muestra
+X160	X160	Muestra
+blank1	blank1	Blanco
+blank2	blank2	Blanco
+blank3	blank3	Blanco
+blank4	blank4	Blanco
+QC00	QC00	Control de Calidad
+QC0	QC0	Control de Calidad
+QC1	QC1	Control de Calidad
+QC2	QC2	Control de Calidad
+QC3	QC3	Control de Calidad
+QC4	QC4	Control de Calidad
+QC5	QC5	Control de Calidad

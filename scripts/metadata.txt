@@ -1,0 +1,2 @@
+dataset_name	source	description	study_reference	processing_date	ion_modes1	ion_modes2	sample_count	analysis_software	comments
+1	ST003564 - Metabolomic analysis of Pap tests	https://www.metabolomicsworkbench.org/data/DRCCMetadata.php?Mode=Study&StudyID=ST003564	Análisis metabolómico de muestras de Pap tests de mujeres mayores de 50 años, realizado mediante UHPLC-MS.	Sah et al., Metabolites 2024, 14, 600. https://doi.org/10.3390/metabo14110600	20174	Positive	Negative	29	UHPLC-MS	Datos descargados y procesados en R para estructuración en SummarizedExperiment.

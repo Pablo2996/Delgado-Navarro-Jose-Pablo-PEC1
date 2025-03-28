@@ -1,0 +1,189 @@
+---
+title: "Código para Análisis Metabolómico - PEC1"
+author: "Jose Pablo Delgado Navarro"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+    number_sections: false
+fontsize: 11pt
+geometry: margin=1in
+---
+
+\newpage
+
+# Introducción  
+Este documento contiene el código R utilizado para procesar y analizar el dataset ST003564 del Metabolomics Workbench, replicando el enfoque del estudio sobre Pap tests. Se genera un objeto de clase `SummarizedExperiment` integrando los datos y metadatos, y se realizan análisis exploratorios (histograma, PCA y clustering). Además, se exportan los metadatos (colData, rowData y metadata) a archivos de texto para su documentación. 
+
+> Para un análisis más detallado de esté informe refierase al archivo **Delgado-Navarro-Jose-Pablo-PEC1**, en el repositorio de la PEC.
+
+# Código para el Preprocesamiento de Datos
+
+## Librerias
+
+```{r, echo=TRUE, message=FALSE}
+# Cargar las librerías necesarias
+library(readr)           # Para la lectura de archivos
+library(tidyr)           # Para manipulación de datos (separar columnas)
+library(ggplot2)         # Para la generación de gráficos
+library(ggfortify)       # Para facilitar el trazado del PCA
+library(pheatmap)        # Para generar heatmaps (clustering)
+library(SummarizedExperiment)  # Para la estructura de datos integrados
+```
+
+## Importación
+
+```{r}
+# Leer los archivos de resultados de ionización positiva y negativa
+ST003564_AN005855_Results <- read.table("ST003564_AN005855_Results.txt", header = TRUE, sep = "\t")
+ST003564_AN005856_Results <- read.table("ST003564_AN005856_Results.txt", header = TRUE, sep = "\t")
+
+# Agregar el modo de ionización a cada conjunto de datos
+ST003564_AN005855_Results$IonMode <- "Positive"
+ST003564_AN005856_Results$IonMode <- "Negative"
+
+# Separar la columna 'mz_rt' en dos columnas: 'mz' (masa/carga) y 'rt' (tiempo de retención)
+ST003564_AN005855_Results <- ST003564_AN005855_Results %>% 
+  separate(col = mz_rt, into = c("mz", "rt"), sep = "_", convert = TRUE)
+ST003564_AN005856_Results <- ST003564_AN005856_Results %>% 
+  separate(col = mz_rt, into = c("mz", "rt"), sep = "_", convert = TRUE)
+```
+
+## Creación de la Matriz de Datos y Metadatos
+
+```{r}
+# Crear matrices de intensidades (excluyendo las columnas 'mz', 'rt' e 'IonMode')
+matrizDatos_pos <- as.matrix(ST003564_AN005855_Results[, !(names(ST003564_AN005855_Results) %in% c("mz", "rt", "IonMode"))])
+matrizDatos_neg <- as.matrix(ST003564_AN005856_Results[, !(names(ST003564_AN005856_Results) %in% c("mz", "rt", "IonMode"))])
+
+# Combinar ambas matrices en una sola matriz de intensidades
+matrizDatos <- rbind(matrizDatos_pos, matrizDatos_neg)
+
+# Crear colData: metadatos de las muestras. Se asume que los nombres de las columnas son los identificadores de las muestras.
+muestras <- colnames(matrizDatos)
+tipoMuestra <- ifelse(grepl("blank", muestras, ignore.case = TRUE), "Blanco",
+                      ifelse(grepl("QC", muestras, ignore.case = TRUE), "Control de Calidad", "Muestra"))
+colData <- data.frame(SampleName = muestras, SampleType = tipoMuestra, row.names = muestras)
+
+# Crear rowData: metadatos de las características (metabolitos)
+rowData <- data.frame(
+  mz = c(ST003564_AN005855_Results$mz, ST003564_AN005856_Results$mz), 
+  rt = c(ST003564_AN005855_Results$rt, ST003564_AN005856_Results$rt),
+  IonMode = c(rep("Positive", nrow(ST003564_AN005855_Results)), rep("Negative", nrow(ST003564_AN005856_Results))),
+  row.names = rownames(matrizDatos)
+)
+```
+
+## Creación del Objeto SummarizedExperiment y Asignación de Metadata
+
+```{r}
+# Crear el objeto SummarizedExperiment
+PEC1 <- SummarizedExperiment(
+  assays = list(counts = matrizDatos),
+  colData = colData,
+  rowData = rowData
+)
+
+# Asignar metadata general al objeto, que describe el dataset y el proceso de obtención
+metadata(PEC1) <- list(
+  dataset_name = "ST003564 - Metabolomic analysis of Pap tests",
+  source = "https://www.metabolomicsworkbench.org/data/DRCCMetadata.php?Mode=Study&StudyID=ST003564",
+  description = "Análisis metabolómico de muestras de Pap tests de mujeres mayores de 50 años, realizado mediante UHPLC-MS.",
+  study_reference = "Sah et al., Metabolites 2024, 14, 600. https://doi.org/10.3390/metabo14110600",
+  processing_date = Sys.Date(),
+  ion_modes = c("Positive", "Negative"),
+  sample_count = 29,
+  analysis_software = "UHPLC-MS",
+  comments = "Datos descargados y procesados en R para estructuración en SummarizedExperiment."
+)
+```
+
+## Exportación de Metadatos a Archivos de Texto
+
+```{r}
+# Exportar colData a un archivo .txt
+write.table(as.data.frame(colData(PEC1)), file = "colData.txt", sep = "\t", quote = FALSE, row.names = TRUE)
+
+# Exportar rowData a un archivo .txt
+write.table(as.data.frame(rowData(PEC1)), file = "rowData.txt", sep = "\t", quote = FALSE, row.names = TRUE)
+
+# Exportar metadata a un archivo .txt
+# Se convierte la lista a data.frame de forma transpuesta para una mejor visualización
+metadata_df <- data.frame(t(unlist(metadata(PEC1))))
+write.table(metadata_df, file = "metadata.txt", sep = "\t", quote = FALSE, row.names = TRUE)
+```
+
+## Descripción de Metadatos
+
+Esta sección describe los metadatos del conjunto de datos utilizado en el análisis metabolómico de Pap tests.
+
+## 1. colData.txt  
+Contiene información sobre las muestras, incluyendo:  
+- **SampleName:** Identificador de la muestra.  
+- **SampleType:** Tipo de muestra (Muestra, Blanco, QC).  
+
+## 2. rowData.txt  
+Describe las características de los metabolitos detectados:  
+- **mz:** Relación masa/carga.  
+- **rt:** Tiempo de retención en la columna UHPLC.  
+- **IonMode:** Modo de ionización (Positivo/Negativo).  
+
+## 3. metadata.txt  
+Contiene una descripción general del dataset, incluyendo su origen y procesamiento.  
+
+## Exportar el objeto SummarizedExperiment (PEC1)
+
+```{r}
+save(PEC1, file = "Delgado-Navarro-Jose-PabloPEC1.rda") 
+```
+
+# Código para el Análisis Exploratorio
+
+## Distribución de Intensidades
+
+```{r, fig.align='center'}
+# Histograma de las intensidades (transformadas a escala log10)
+hist(log10(assay(PEC1) + 1), breaks = 50, 
+     col = "skyblue",
+     main = "Distribución de Peak Areas (log10)", 
+     xlab = "Peak Area (log10)")
+
+```
+
+## Análisis de Componentes Principales (PCA)
+
+```{r, fig.align='center'}
+# Realizar PCA sobre la matriz de intensidades (se transponen para que las muestras estén en filas)
+PCA_PEC1 <- prcomp(t(assay(PEC1)), scale. = TRUE)
+
+# Filtrar solo las muestras biológicas (excluyendo QC y Blanks)
+muestras_biologicas <- colData(PEC1)$SampleType == "Muestra"
+PCA_PEC1_muestras <- prcomp(t(assay(PEC1)[, muestras_biologicas]), scale. = TRUE)
+
+# Graficar el PCA de las muestras biológicas
+autoplot(PCA_PEC1_muestras, data = as.data.frame(colData(PEC1))[muestras_biologicas, ], 
+         colour = "SampleName") +
+  theme_minimal() +
+  ggtitle("PCA de Muestras Biológicas") +
+  theme(legend.position = "none")
+```
+
+## Clustering Jerárquico (Heatmap)
+
+```{r, fig.align='center'}
+# Filtrar las muestras reales (excluyendo QC y Blanks)
+muestras_reales <- PEC1[, !(colData(PEC1)$SampleType %in% c("QC", "Blanco"))]
+
+# Generar heatmap con pheatmap, escalando los datos por fila
+pheatmap(assay(muestras_reales), scale = "row", 
+         clustering_distance_rows = "euclidean", 
+         clustering_distance_cols = "euclidean", 
+         clustering_method = "complete", 
+         show_rownames = FALSE, show_colnames = TRUE,
+         main = "Clustering de Muestras (Spearman)")
+```
+
+# Conclusión
+
+> Este documento recopila el código utilizado para procesar y analizar el dataset ST003564, integrándolo en un objeto `SummarizedExperiment.` Se realizaron análisis exploratorios (histograma, PCA y clustering) para evaluar la distribución de intensidades y la agrupación de muestras biológicas, y se exportaron los metadatos a archivos de texto para su documentación. Este código permite replicar el análisis de forma integral y reproducible.
